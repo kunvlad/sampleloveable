@@ -164,29 +164,6 @@ const WorkflowManager = () => {
     });
   };
 
-  // Handler to delete all steps in the current workflow
-  const handleDeleteAllSteps = async () => {
-    if (!selectedWorkflow) {
-      toast({
-        title: "No Workflow Selected",
-        description: "Please select a workflow to clear its steps.",
-        variant: "destructive",
-      });
-      return;
-    }
-    try {
-      // Update in Supabase
-      await updateWorkflow({ id: selectedWorkflow, updates: { workflow_steps: [] }, supabase });
-      // Update local state
-      setWorkflowSteps([]);
-      // Refresh workflows
-      if (user?.id) getWorkflows(supabase, user.id).then(setWorkflows);
-      toast({ title: "All Steps Deleted", description: "All steps have been deleted from the current workflow." });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
-  };
-
   const clearForm = () => {
     setWorkflowName('');
     setWorkflowDescription('');
@@ -224,16 +201,6 @@ const WorkflowManager = () => {
       </div>
       <div className="border-t pt-4">
         <h2 className="text-xl font-semibold mb-2">Workflow Actions</h2>
-        <div className="flex flex-wrap gap-2 mb-2">
-          <button
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded shadow"
-            onClick={handleDeleteAllSteps}
-            disabled={!selectedWorkflow || workflowSteps.length === 0}
-            type="button"
-          >
-            Delete All Steps
-          </button>
-        </div>
         <WorkflowActions
           workflowSteps={workflowSteps}
           copyStatus={copyStatus}

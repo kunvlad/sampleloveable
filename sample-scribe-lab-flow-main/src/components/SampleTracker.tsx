@@ -426,6 +426,13 @@ export const SampleTracker: React.FC<SampleTrackerProps> = ({ samples, onUpdateS
     return breakdown;
   };
 
+  // Handler to delete all samples
+  const handleDeleteAllSamples = () => {
+    onUpdateSamples([]);
+    localStorage.removeItem('lab-samples');
+    toast('All Samples Deleted', { description: 'All samples have been deleted from the Sample Tracker System.' });
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {/* Sample List */}
@@ -603,6 +610,14 @@ export const SampleTracker: React.FC<SampleTrackerProps> = ({ samples, onUpdateS
             <h3 className="text-lg font-semibold">Sample History</h3>
             <Switch id="sample-history-visible" checked={isSampleHistoryVisible} onCheckedChange={setIsSampleHistoryVisible} />
           </div>
+          <button
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded shadow mb-4"
+            onClick={handleDeleteAllSamples}
+            type="button"
+            disabled={samples.length === 0}
+          >
+            Delete All Samples
+          </button>
           {isSampleHistoryVisible && (
             <SampleHistoryTree
               samples={samples}

@@ -38,10 +38,19 @@ type InstrumentBookingCalendarProps = {
 // --- Insert user to booking type override (only for local use)
 type BookingWithUser = InstrumentBooking & { user?: string };
 
-export const InstrumentBookingCalendar: React.FC<InstrumentBookingCalendarProps> = ({
+export const InstrumentBookingCalendar: React.FC<InstrumentBookingCalendarProps & {
+  viewMode?: InstrumentBookingCalendarViewMode;
+  onViewModeChange?: (mode: InstrumentBookingCalendarViewMode) => void;
+  refDate?: Date;
+  onRefDateChange?: (date: Date) => void;
+}> = ({
   instrumentBookings,
   instruments,
-  defaultCalendarMode = "per-instrument" // NEW: allow parent to override
+  defaultCalendarMode = "per-instrument",
+  viewMode: controlledViewMode,
+  onViewModeChange,
+  refDate: controlledRefDate,
+  onRefDateChange,
 }) => {
   // Fix: Only filter for Agilent instruments, do NOT require LC in name
   const agilentInstruments = React.useMemo(
@@ -86,13 +95,13 @@ export const InstrumentBookingCalendar: React.FC<InstrumentBookingCalendarProps>
   }
 
   // Calendar view: day, week, month
-  const [viewMode, setViewMode] = useState<"day" | "week" | "month">("day");
+  const [viewMode, setViewModeState] = useState<InstrumentBookingCalendarViewMode>(controlledViewMode || "day");
   // Show all instruments or per instrument
   const [calendarMode, setCalendarMode] = useState<"per-instrument" | "whole-lab">(defaultCalendarMode);
   // Which instrument to show (for per-instrument mode)
   const [selectedInstrument, setSelectedInstrument] = useState<string>(agilentInstruments[0]?.id || "");
   // Current reference date
-  const [refDate, setRefDate] = useState<Date>(startOfDay(new Date()));
+  const [refDate, setRefDateState] = useState<Date>(controlledRefDate || startOfDay(new Date()));
 
   // Derived date ranges
   const currentRange = useMemo(() => {
@@ -156,18 +165,34 @@ export const InstrumentBookingCalendar: React.FC<InstrumentBookingCalendarProps>
   }, [instrumentBookings, currentRange, calendarMode, selectedInstrument, agilentInstruments, maintenanceBookings, viewMode]);
 
   // Instruments list logic
+  React.useEffect(() => {
+    if (controlledViewMode && controlledViewMode !== viewMode) setViewModeState(controlledViewMode);
+  }, [controlledViewMode]);
+  React.useEffect(() => {
+    if (controlledRefDate && controlledRefDate.getTime() !== refDate.getTime()) setRefDateState(controlledRefDate);
+  }, [controlledRefDate]);
+
+  // When local state changes, notify parent
+  React.useEffect(() => {
+    if (onViewModeChange) onViewModeChange(viewMode);
+  }, [viewMode]);
+  React.useEffect(() => {
+    if (onRefDateChange) onRefDateChange(refDate);
+  }, [refDate]);
+
+  // Replace setViewMode/setRefDate with local setters
   function handlePrev() {
-    if (viewMode === "day") setRefDate(addDays(refDate, -1));
-    else if (viewMode === "week") setRefDate(addWeeks(refDate, -1));
-    else setRefDate(addMonths(refDate, -1));
+    if (viewMode === "day") setRefDateState(addDays(refDate, -1));
+    else if (viewMode === "week") setRefDateState(addWeeks(refDate, -1));
+    else setRefDateState(addMonths(refDate, -1));
   }
   function handleNext() {
-    if (viewMode === "day") setRefDate(addDays(refDate, 1));
-    else if (viewMode === "week") setRefDate(addWeeks(refDate, 1));
-    else setRefDate(addMonths(refDate, 1));
+    if (viewMode === "day") setRefDateState(addDays(refDate, 1));
+    else if (viewMode === "week") setRefDateState(addWeeks(refDate, 1));
+    else setRefDateState(addMonths(refDate, 1));
   }
   function handleToday() {
-    setRefDate(startOfDay(new Date()));
+    setRefDateState(startOfDay(new Date()));
   }
 
   // Modal handlers
@@ -489,7 +514,7 @@ export const InstrumentBookingCalendar: React.FC<InstrumentBookingCalendarProps>
   function CalendarToolbar() {
     return (
       <div className="flex flex-wrap gap-2 items-center mb-2">
-        <Tabs value={viewMode} onValueChange={v => setViewMode(v as any)}>
+        <Tabs value={viewMode} onValueChange={v => setViewModeState(v as any)}>
           <TabsList>
             <TabsTrigger value="day">Day</TabsTrigger>
             <TabsTrigger value="week">Week</TabsTrigger>
@@ -607,3 +632,6 @@ export const InstrumentBookingCalendar: React.FC<InstrumentBookingCalendarProps>
     </div>
   );
 };
+
+// Add export for syncing
+export type InstrumentBookingCalendarViewMode = "day" | "week" | "month";

@@ -498,6 +498,17 @@ const Index = () => {
     ]);
   };
 
+  // Listen for clear-all-samples event from WorkflowManager
+  useEffect(() => {
+    const handleClearAllSamples = () => {
+      setSamples([]);
+      localStorage.removeItem('lab-samples');
+      toast({ title: 'All Samples Deleted', description: 'All samples have been deleted from the Sample Tracker System.' });
+    };
+    window.addEventListener('clear-all-samples', handleClearAllSamples);
+    return () => window.removeEventListener('clear-all-samples', handleClearAllSamples);
+  }, [toast]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <div className="container mx-auto px-4 py-8">
@@ -547,12 +558,19 @@ const Index = () => {
               onAddSample={() => setScannerOpen(true)}
               onAddSamples={addSamples}   // <-- ADDED LINE
             />
-            <div className="mt-4">
+            <div className="mt-4 flex flex-row gap-2 items-center">
               <Button
                 onClick={handleAssignSelectedAndGo}
                 variant="default"
               >
                 Send to Analysis Scheduler
+              </Button>
+              <Button
+                onClick={() => setSamples([])}
+                variant="destructive"
+                disabled={samples.length === 0}
+              >
+                Delete All Samples
               </Button>
             </div>
             <div className="mt-8">

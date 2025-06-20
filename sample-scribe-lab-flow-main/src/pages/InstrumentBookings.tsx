@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { InstrumentBookingCalendar, InstrumentBooking } from "@/components/InstrumentBookingCalendar";
+import { InstrumentBookingCalendar, InstrumentBooking, InstrumentBookingCalendarViewMode } from "@/components/InstrumentBookingCalendar";
 import { InstrumentManagementPanel } from "@/components/InstrumentManagementPanel";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { WeekCalendar, CalendarEvent } from "@/components/ui/WeekCalendar";
 
 // AGILENT instrument info (adjust as needed)
 const AGILENT_INSTRUMENTS = [
@@ -30,6 +31,21 @@ const DEMO_BOOKINGS: InstrumentBooking[] = [
 
 const InstrumentBookings: React.FC = () => {
   const [bookings, setBookings] = useState<InstrumentBooking[]>([]);
+  const [calendarViewMode, setCalendarViewMode] = useState<InstrumentBookingCalendarViewMode>("week");
+  const [calendarRefDate, setCalendarRefDate] = useState<Date>(new Date());
+  const [selectedInstrumentId, setSelectedInstrumentId] = useState<string | undefined>(undefined);
+  const [modalState, setModalState] = useState<{ type: 'add' | 'edit' | 'delete' | 'maintenance' | null, event?: CalendarEvent, date?: Date }>({ type: null });
+
+  // Map instrument bookings to calendar events for demo
+  const calendarEvents: CalendarEvent[] = bookings.map((b, i) => ({
+    id: `${b.instrumentId}-${i}`,
+    title: `${b.project} (${AGILENT_INSTRUMENTS.find(instr => instr.id === b.instrumentId)?.name || b.instrumentId})`,
+    start: new Date(b.start),
+    end: new Date(b.end),
+    instrumentId: b.instrumentId,
+    project: b.project,
+    isMaintenance: b.project === 'Maintenance',
+  }));
 
   useEffect(() => {
     // Fetch from localStorage and convert date strings to Date objects
@@ -59,33 +75,120 @@ const InstrumentBookings: React.FC = () => {
     return () => window.removeEventListener('storage', syncBookings);
   }, []);
 
+  // --- Booking Management Handlers ---
+  const saveBookings = (updated: InstrumentBooking[]) => {
+    setBookings(updated);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new Event('storage'));
+  };
+
+  const handleAddBooking = (date: Date, instrumentId?: string) => {
+    setModalState({ type: 'add', date, event: undefined });
+  };
+
+  const handleEditBooking = (event: CalendarEvent) => {
+    setModalState({ type: 'edit', event });
+  };
+
+  const handleDeleteBooking = (event: CalendarEvent) => {
+    setModalState({ type: 'delete', event });
+  };
+
+  const handleAddMaintenance = (date: Date, instrumentId?: string) => {
+    setModalState({ type: 'maintenance', date, event: undefined });
+  };
+
+  const handleDropBooking = (event: CalendarEvent, newDate: Date) => {
+    // Move booking to new date/time
+    const idx = bookings.findIndex(b => `${b.instrumentId}-${idx}` === event.id);
+    if (idx !== -1) {
+      const updated = [...bookings];
+      const duration = updated[idx].end.getTime() - updated[idx].start.getTime();
+      updated[idx] = {
+        ...updated[idx],
+        start: newDate,
+        end: new Date(newDate.getTime() + duration),
+      };
+      saveBookings(updated);
+    }
+  };
+
+  // --- Modal Dialog Logic (pseudo, for demonstration) ---
+  // You would implement actual dialogs for add/edit/delete/maintenance here
+  // For now, just auto-handle and close modalState
+  useEffect(() => {
+    if (modalState.type === 'add' && modalState.date) {
+      // Add a new booking (demo: 2h block)
+      const newBooking: InstrumentBooking = {
+        instrumentId: selectedInstrumentId || AGILENT_INSTRUMENTS[0].id,
+        project: 'New Booking',
+        start: modalState.date,
+        end: new Date(modalState.date.getTime() + 2 * 60 * 60 * 1000),
+      };
+      saveBookings([...bookings, newBooking]);
+      setModalState({ type: null });
+    } else if (modalState.type === 'delete' && modalState.event) {
+      const updated = bookings.filter((b, i) => `${b.instrumentId}-${i}` !== modalState.event!.id);
+      saveBookings(updated);
+      setModalState({ type: null });
+    } else if (modalState.type === 'edit' && modalState.event) {
+      // For demo, just update project name
+      const idx = bookings.findIndex((b, i) => `${b.instrumentId}-${i}` === modalState.event!.id);
+      if (idx !== -1) {
+        const updated = [...bookings];
+        updated[idx] = { ...updated[idx], project: updated[idx].project + ' (Edited)' };
+        saveBookings(updated);
+      }
+      setModalState({ type: null });
+    } else if (modalState.type === 'maintenance' && modalState.date) {
+      const newBooking: InstrumentBooking = {
+        instrumentId: selectedInstrumentId || AGILENT_INSTRUMENTS[0].id,
+        project: 'Maintenance',
+        start: modalState.date,
+        end: new Date(modalState.date.getTime() + 2 * 60 * 60 * 1000),
+      };
+      saveBookings([...bookings, newBooking]);
+      setModalState({ type: null });
+    }
+  }, [modalState]);
+
   return (
-    <div className="container mx-auto py-8 px-2">
-      {/* Instrument Management at the top */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Instrument Management</CardTitle>
-          <div className="mt-1 mb-2 text-sm text-muted-foreground">
-            Manage and view current and upcoming bookings for all Agilent instruments in the laboratory.
-          </div>
-        </CardHeader>
-        <CardContent>
-          <InstrumentManagementPanel />
-        </CardContent>
-      </Card>
-      {/* Booking Calendar below */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Booking Calendar</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <InstrumentBookingCalendar
-            instrumentBookings={bookings}
-            instruments={AGILENT_INSTRUMENTS}
-            defaultCalendarMode="whole-lab"
-          />
-        </CardContent>
-      </Card>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-4">Instrument Bookings</h1>
+      <div className="mb-8">
+        <InstrumentManagementPanel instruments={AGILENT_INSTRUMENTS} />
+      </div>
+      <div className="mb-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Week Calendar (Modern Outlook Style)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <WeekCalendar
+              events={calendarEvents}
+              weekStart={calendarRefDate}
+              instruments={AGILENT_INSTRUMENTS}
+              selectedInstrumentId={selectedInstrumentId}
+              onAddBooking={handleAddBooking}
+              onEditBooking={handleEditBooking}
+              onDeleteBooking={handleDeleteBooking}
+              onAddMaintenance={handleAddMaintenance}
+              onDropBooking={handleDropBooking}
+            />
+          </CardContent>
+        </Card>
+      </div>
+      <div className="mb-8">
+        <InstrumentBookingCalendar
+          instrumentBookings={bookings}
+          instruments={AGILENT_INSTRUMENTS}
+          defaultCalendarMode="whole-lab"
+          viewMode={calendarViewMode}
+          onViewModeChange={setCalendarViewMode}
+          refDate={calendarRefDate}
+          onRefDateChange={setCalendarRefDate}
+        />
+      </div>
       <div className="mt-6 flex justify-center">
         <Link to="/">
           <Button variant="outline">Back to Dashboard</Button>
